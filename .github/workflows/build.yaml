@@ -1,0 +1,91 @@
+name: Build and Push Multi-Architecture Docker Image
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'app/**'
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+  workflow_dispatch:
+
+jobs:
+  # Job para construir la imagen x86_64
+  build-x86:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push x86_64 image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: leonhrt/dev-images-hub:agent-test-amd64
+          cache-from: type=registry,ref=leonhrt/dev-images-hub:agent-test-amd64-cache
+          cache-to: type=registry,ref=leonhrt/dev-images-hub:agent-test-amd64-cache,mode=max
+
+  # Job para construir la imagen ARM64
+  build-arm:
+    runs-on: ubuntu-22.04-arm  # Requiere un runner auto-hospedado en ARM
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push ARM64 image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: leonhrt/dev-images-hub:agent-test-arm64
+          cache-from: type=registry,ref=leonhrt/dev-images-hub:agent-test-arm64-cache
+          cache-to: type=registry,ref=leonhrt/dev-images-hub:agent-test-arm64-cache,mode=max
+
+  # Job para crear y publicar el manifiesto multi-arquitectura
+  create-manifest:
+    needs: [build-x86, build-arm]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push manifest
+        run: |
+          docker manifest create leonhrt/dev-images-hub:agent-test-k3s \
+            leonhrt/dev-images-hub:agent-test-amd64 \
+            leonhrt/dev-images-hub:agent-test-arm64
+
+          docker manifest annotate --arch amd64 leonhrt/dev-images-hub:agent-test-k3s \
+            leonhrt/dev-images-hub:agent-test-amd64
+          
+          docker manifest annotate --arch arm64 leonhrt/dev-images-hub:agent-test-k3s \
+            leonhrt/dev-images-hub:agent-test-arm64
+          
+          docker manifest push leonhrt/dev-images-hub:agent-test-k3s
