@@ -1,14 +1,28 @@
 FROM python:3.13-alpine AS builder
-RUN apk add --no-cache gcc musl-dev libffi-dev
+
+RUN apk add --no-cache \
+    gcc \
+    g++ \
+    musl-dev \
+    libffi-dev \
+    rust \
+    cargo \
+    make \
+    cmake \
+    linux-headers \
+    openssl-dev \
+    git
+RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir poetry==2.1.1
 WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 RUN poetry config virtualenvs.create false
-RUN poetry install --no-root --only main
+RUN poetry install --no-root --only main || \
+    (echo "Failed to install dependencies. Check build logs for details." && exit 1)
 COPY ./app/ /app/app/
 
 FROM python:3.13-alpine as runtime
-RUN apk add --no-cache libffi
+RUN apk add --no-cache libffi libstdc++
 WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
