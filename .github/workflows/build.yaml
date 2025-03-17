@@ -63,39 +63,3 @@ jobs:
           tags: leonhrt/dev-images-hub:agent-test-arm64-${{ github.sha }}
           cache-from: type=registry,ref=leonhrt/dev-images-hub:agent-test-arm64-cache
           cache-to: type=registry,ref=leonhrt/dev-images-hub:agent-test-arm64-cache,mode=max
-
-  # Job para crear y publicar el manifiesto multi-arquitectura
-  create-manifest:
-    needs: [build-x86, build-arm]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      
-      - name: Create and push manifest
-        run: |
-          # Primero eliminamos cualquier manifest existente para evitar conflictos
-          docker manifest rm leonhrt/dev-images-hub:agent-test-k3s || true
-          
-          # Creamos un nuevo manifest
-          docker manifest create leonhrt/dev-images-hub:agent-test-k3s \
-            leonhrt/dev-images-hub:agent-test-amd64-${{ github.sha }} \
-            leonhrt/dev-images-hub:agent-test-arm64-${{ github.sha }}
-          
-          # Anotamos las arquitecturas
-          docker manifest annotate --arch amd64 leonhrt/dev-images-hub:agent-test-k3s \
-            leonhrt/dev-images-hub:agent-test-amd64-${{ github.sha }}
-          docker manifest annotate --arch arm64 leonhrt/dev-images-hub:agent-test-k3s \
-            leonhrt/dev-images-hub:agent-test-arm64-${{ github.sha }}
-          
-          # Publicamos el manifest
-          docker manifest push leonhrt/dev-images-hub:agent-test-k3s
-          
-          # También creamos un tag con el SHA para trazabilidad
-          docker manifest create leonhrt/dev-images-hub:agent-test-k3s-${{ github.sha }} \
-            leonhrt/dev-images-hub:agent-test-amd64-${{ github.sha }} \
-            leonhrt/dev-images-hub:agent-test-arm64-${{ github.sha }}
-          docker manifest push leonhrt/dev-images-hub:agent-test-k3s-${{ github.sha }}
