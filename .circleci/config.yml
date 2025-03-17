@@ -1,138 +1,98 @@
 version: 2.1
 
-orbs:
-  docker: circleci/docker@2.2.0
-
 parameters:
   docker-username:
     type: string
     default: ${DOCKER_USERNAME}
-  docker-image-name:
+  docker-password:
+    type: string
+    default: ${DOCKER_PASSWORD}
+  image-name:
     type: string
     default: "leonhrt/dev-images-hub"
-  docker-image-tag:
+  image-tag:
     type: string
-    default: "agent-test"  # You can also use ${CIRCLE_SHA1:0:7} for git commit hash
+    default: "${CIRCLE_SHA1:0:7}"
+
+orbs:
+  docker: circleci/docker@2.2.0
+
+executors:
+  amd64-executor:
+    docker:
+      - image: cimg/base:2023.03
+    resource_class: medium
+  arm64-executor:
+    machine:
+      image: ubuntu-2004:current
+    resource_class: arm.medium
 
 jobs:
   build-and-push-amd64:
-    docker:
-      - image: cimg/base:2023.03
-        auth:
-          username: $DOCKER_USERNAME
-          password: $DOCKER_PASSWORD
-    resource_class: medium  # x86 runner
+    executor: amd64-executor
     steps:
       - checkout
-      - setup_remote_docker:
-          version: default
-      - docker/check:
-          registry: $DOCKER_REGISTRY
-      - run:
-          name: Build and push AMD64 image
-          command: |
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-            docker build -t << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-amd64 --platform linux/amd64 .
-            docker push << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-amd64
+      - setup_remote_docker
+      - docker/check
+      - docker/build:
+          image: << pipeline.parameters.image-name >>
+          tag: << pipeline.parameters.image-tag >>-amd64
+          extra_build_args: --platform=linux/amd64
+      - docker/push:
+          image: << pipeline.parameters.image-name >>
+          tag: << pipeline.parameters.image-tag >>-amd64
 
   build-and-push-arm64:
-    docker:
-      - image: cimg/base:2023.03
-        auth:
-          username: $DOCKER_USERNAME
-          password: $DOCKER_PASSWORD
-    resource_class: arm.medium  # ARM64 runner
+    executor: arm64-executor
     steps:
       - checkout
-      - setup_remote_docker:
-          version: default
-      - docker/check:
-          registry: $DOCKER_REGISTRY
-      - run:
-          name: Build and push ARM64 image
-          command: |
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-            docker build -t << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-arm64 --platform linux/arm64/v8 .
-            docker push << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-arm64
+      - docker/check
+      - docker/build:
+          image: << pipeline.parameters.image-name >>
+          tag: << pipeline.parameters.image-tag >>-arm64
+          extra_build_args: --platform=linux/arm64
+      - docker/push:
+          image: << pipeline.parameters.image-name >>
+          tag: << pipeline.parameters.image-tag >>-arm64
 
-  create-manifest:
-    docker:
-      - image: cimg/base:2023.03
-        auth:
-          username: $DOCKER_USERNAME
-          password: $DOCKER_PASSWORD
-    resource_class: small
+  create-manifest-and-push:
+    executor: amd64-executor
     steps:
-      - setup_remote_docker:
-          version: default
+      - checkout
+      - setup_remote_docker
       - run:
-          name: Create and push multiarch manifest
+          name: Install Docker CLI plugins for buildx
+          command: |
+            mkdir -p ~/.docker/cli-plugins
+            curl -L -o ~/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.10.4/buildx-v0.10.4.linux-amd64
+            chmod +x ~/.docker/cli-plugins/docker-buildx
+            docker buildx version
+      - run:
+          name: Create and push multi-architecture manifest
           command: |
             echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
             
-            # Create manifest list
-            docker manifest create \
-              << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>> \
-              --amend << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-amd64 \
-              --amend << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-arm64
+            # Create the manifest
+            docker buildx imagetools create \
+              --tag << pipeline.parameters.image-name >>:<< pipeline.parameters.image-tag >> \
+              --tag << pipeline.parameters.image-name >>:latest \
+              << pipeline.parameters.image-name >>:<< pipeline.parameters.image-tag >>-amd64 \
+              << pipeline.parameters.image-name >>:<< pipeline.parameters.image-tag >>-arm64
             
-            # Add architecture-specific annotations
-            docker manifest annotate \
-              << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>> \
-              << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-amd64 \
-              --os linux --arch amd64
-            
-            docker manifest annotate \
-              << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>> \
-              << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-arm64 \
-              --os linux --arch arm64
-            
-            # Push the manifest
-            docker manifest push << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>
-            
-            # Also create and push a manifest with the git hash or latest tag if applicable
-            if [ "${CIRCLE_BRANCH}" = "main" ] || [ "${CIRCLE_BRANCH}" = "master" ]; then
-              # Create latest manifest
-              docker manifest create \
-                << pipeline.parameters.docker-image-name >>:latest \
-                --amend << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-amd64 \
-                --amend << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-arm64
-              
-              # Add architecture-specific annotations for latest
-              docker manifest annotate \
-                << pipeline.parameters.docker-image-name >>:latest \
-                << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-amd64 \
-                --os linux --arch amd64
-              
-              docker manifest annotate \
-                << pipeline.parameters.docker-image-name >>:latest \
-                << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-arm64 \
-                --os linux --arch arm64
-              
-              # Push latest manifest
-              docker manifest push << pipeline.parameters.docker-image-name >>:latest
-            fi
+            # Verify the manifest
+            docker buildx imagetools inspect << pipeline.parameters.image-name >>:<< pipeline.parameters.image-tag >>
 
 workflows:
-  multiarch-build:
+  version: 2
+  build-multiarch-image:
     jobs:
       - build-and-push-amd64:
           context:
             - dockerhub-credentials
-          filters:
-            branches:
-              only:
-                - main
-                - master  # Include both main and master for compatibility
       - build-and-push-arm64:
           context:
             - dockerhub-credentials
-          filters:
-            branches:
-              only:
-                - main
-                - master
-      - create-manifest:
+      - create-manifest-and-push:
           requires:
             - build-and-push-amd64
             - build-and-push-arm64
@@ -140,6 +100,4 @@ workflows:
             - dockerhub-credentials
           filters:
             branches:
-              only:
-                - main
-                - master
+              only: main
