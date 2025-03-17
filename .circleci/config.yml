@@ -70,7 +70,14 @@ jobs:
       - run:
           name: Create and push multi-architecture manifest
           command: |
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            # Check if credentials are available
+            if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_PASSWORD" ]; then
+              echo "Error: Docker Hub credentials not available. Please ensure DOCKER_USERNAME and DOCKER_PASSWORD are set in the CircleCI context."
+              exit 1
+            fi
+            
+            # Login to Docker Hub with explicit credentials
+            docker login --username "${DOCKER_USERNAME}" --password "${DOCKER_PASSWORD}"
             
             # Create the manifest
             docker buildx imagetools create \
