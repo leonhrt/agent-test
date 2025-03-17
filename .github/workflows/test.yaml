@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
     inputs:
       amd64_tag:
-        description: 'Tag de la imagen AMD64 (sin el prefijo leonhrt/dev-images-hub:)'
+        description: 'AMD64 image tag (sin el prefijo leonhrt/dev-images-hub:)'
         required: true
         default: 'agent-test-amd64-c1da890df23b20fe6a75850e4655d6bf0d93c514'
       arm64_tag:
-        description: 'Tag de la imagen ARM64 (sin el prefijo leonhrt/dev-images-hub:)'
+        description: 'ARM64 image tag (sin el prefijo leonhrt/dev-images-hub:)'
         required: true
         default: 'agent-test-arm64-c1da890df23b20fe6a75850e4655d6bf0d93c514'
       output_tag:
@@ -27,22 +27,13 @@ jobs:
       
       - name: Inspect source images
         run: |
-          echo "Inspeccionando imagen AMD64..."
-          docker manifest inspect leonhrt/dev-images-hub:${{ github.event.inputs.amd64_tag }} || echo "No se pudo inspeccionar la imagen AMD64"
+          echo "Inspecting AMD64 image..."
+          docker manifest inspect leonhrt/dev-images-hub:${{ github.event.inputs.amd64_tag }}
           
-          echo "Inspeccionando imagen ARM64..."
-          docker manifest inspect leonhrt/dev-images-hub:${{ github.event.inputs.arm64_tag }} || echo "No se pudo inspeccionar la imagen ARM64"
+          echo "Inspection ARM64 image..."
+          docker manifest inspect leonhrt/dev-images-hub:${{ github.event.inputs.arm64_tag }}
       
-      - name: Pull images to verify they exist
-        run: |
-          # Intentamos hacer pull para verificar que las imágenes existen
-          docker pull leonhrt/dev-images-hub:${{ github.event.inputs.amd64_tag }} || echo "No se pudo descargar la imagen AMD64"
-          docker pull leonhrt/dev-images-hub:${{ github.event.inputs.arm64_tag }} || echo "No se pudo descargar la imagen ARM64"
-          
-          # Mostrar las imágenes disponibles
-          docker images
-      
-      - name: Create manifest using buildx imagetools
+      - name: Create multi-architecture manifest
         run: |
           # Eliminamos cualquier manifiesto existente con el mismo nombre
           docker manifest rm leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }} || true
@@ -53,29 +44,24 @@ jobs:
             leonhrt/dev-images-hub:${{ github.event.inputs.amd64_tag }} \
             leonhrt/dev-images-hub:${{ github.event.inputs.arm64_tag }}
           
-          # Verificamos que el manifiesto se haya creado correctamente
-          echo "Verificando el nuevo manifiesto creado..."
-          docker manifest inspect leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }}
       
       - name: Fallback to classical manifest method
         if: failure()
         run: |
-          echo "El método buildx imagetools falló, intentando con docker manifest..."
+          echo "buildx imagetools failed, retry with docker manifest..."
           
-          # Intentamos con el método clásico de docker manifest
           docker manifest create leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }} \
             leonhrt/dev-images-hub:${{ github.event.inputs.amd64_tag }} \
             leonhrt/dev-images-hub:${{ github.event.inputs.arm64_tag }}
           
-          # Anotamos las arquitecturas explícitamente
           docker manifest annotate --arch amd64 leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }} \
             leonhrt/dev-images-hub:${{ github.event.inputs.amd64_tag }}
           docker manifest annotate --arch arm64 leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }} \
             leonhrt/dev-images-hub:${{ github.event.inputs.arm64_tag }}
           
-          # Publicamos el manifiesto
           docker manifest push leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }}
-          
-          # Verificamos que el manifiesto se haya creado correctamente
-          echo "Verificando el nuevo manifiesto creado..."
+
+      - name: Verify new manifest
+        run: |
+          echo "Verifying new manifest..."
           docker manifest inspect leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }}
