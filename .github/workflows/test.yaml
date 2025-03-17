@@ -1,0 +1,89 @@
+name: Create Multi-Architecture Manifest
+on:
+  workflow_dispatch:
+    inputs:
+      amd64_tag:
+        description: 'Tag de la imagen AMD64 (sin el prefijo leonhrt/dev-images-hub:)'
+        required: true
+        default: 'agent-test-amd64-c1da890df23b20fe6a75850e4655d6bf0d93c514'
+      arm64_tag:
+        description: 'Tag de la imagen ARM64 (sin el prefijo leonhrt/dev-images-hub:)'
+        required: true
+        default: 'agent-test-arm64-c1da890df23b20fe6a75850e4655d6bf0d93c514'
+      output_tag:
+        description: 'Tag de salida para la imagen multi-arquitectura'
+        required: true
+        default: 'agent-test-k3s'
+
+jobs:
+  create-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Install latest Docker CLI
+        run: |
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+          sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+          docker version
+      
+      - name: Inspect source images
+        run: |
+          echo "Inspeccionando imagen AMD64..."
+          docker manifest inspect leonhrt/dev-images-hub:${{ github.event.inputs.amd64_tag }} || echo "No se pudo inspeccionar la imagen AMD64"
+          
+          echo "Inspeccionando imagen ARM64..."
+          docker manifest inspect leonhrt/dev-images-hub:${{ github.event.inputs.arm64_tag }} || echo "No se pudo inspeccionar la imagen ARM64"
+      
+      - name: Pull images to verify they exist
+        run: |
+          # Intentamos hacer pull para verificar que las imágenes existen
+          docker pull leonhrt/dev-images-hub:${{ github.event.inputs.amd64_tag }} || echo "No se pudo descargar la imagen AMD64"
+          docker pull leonhrt/dev-images-hub:${{ github.event.inputs.arm64_tag }} || echo "No se pudo descargar la imagen ARM64"
+          
+          # Mostrar las imágenes disponibles
+          docker images
+      
+      - name: Create manifest using buildx imagetools
+        run: |
+          # Eliminamos cualquier manifiesto existente con el mismo nombre
+          docker manifest rm leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }} || true
+          
+          # Creamos el manifiesto usando buildx imagetools (método moderno)
+          docker buildx imagetools create \
+            --tag leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }} \
+            leonhrt/dev-images-hub:${{ github.event.inputs.amd64_tag }} \
+            leonhrt/dev-images-hub:${{ github.event.inputs.arm64_tag }}
+          
+          # Verificamos que el manifiesto se haya creado correctamente
+          echo "Verificando el nuevo manifiesto creado..."
+          docker manifest inspect leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }}
+      
+      - name: Fallback to classical manifest method
+        if: failure()
+        run: |
+          echo "El método buildx imagetools falló, intentando con docker manifest..."
+          
+          # Intentamos con el método clásico de docker manifest
+          docker manifest create leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }} \
+            leonhrt/dev-images-hub:${{ github.event.inputs.amd64_tag }} \
+            leonhrt/dev-images-hub:${{ github.event.inputs.arm64_tag }}
+          
+          # Anotamos las arquitecturas explícitamente
+          docker manifest annotate --arch amd64 leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }} \
+            leonhrt/dev-images-hub:${{ github.event.inputs.amd64_tag }}
+          docker manifest annotate --arch arm64 leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }} \
+            leonhrt/dev-images-hub:${{ github.event.inputs.arm64_tag }}
+          
+          # Publicamos el manifiesto
+          docker manifest push leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }}
+          
+          # Verificamos que el manifiesto se haya creado correctamente
+          echo "Verificando el nuevo manifiesto creado..."
+          docker manifest inspect leonhrt/dev-images-hub:${{ github.event.inputs.output_tag }}
