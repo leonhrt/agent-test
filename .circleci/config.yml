@@ -41,6 +41,7 @@ jobs:
 
   build-and-push-arm64:
     executor: arm64-executor
+    parallelism: 4
     steps:
       - checkout
       - run:
