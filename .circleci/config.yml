@@ -31,7 +31,7 @@ jobs:
       - run:
           name: Build and push AMD64 image
           command: |
-            docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
             docker build -t << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-amd64 --platform linux/amd64 .
             docker push << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-amd64
 
@@ -51,7 +51,7 @@ jobs:
       - run:
           name: Build and push ARM64 image
           command: |
-            docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
             docker build -t << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-arm64 --platform linux/arm64/v8 .
             docker push << pipeline.parameters.docker-image-name >>:<<pipeline.parameters.docker-image-tag>>-arm64
 
@@ -68,7 +68,7 @@ jobs:
       - run:
           name: Create and push multiarch manifest
           command: |
-            docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
             
             # Create manifest list
             docker manifest create \
