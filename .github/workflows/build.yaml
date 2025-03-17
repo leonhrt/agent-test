@@ -10,7 +10,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Job para construir la imagen x86_64
   build-x86:
     runs-on: ubuntu-latest
     steps:
@@ -37,9 +36,8 @@ jobs:
           cache-from: type=registry,ref=leonhrt/dev-images-hub:agent-test-amd64-cache
           cache-to: type=registry,ref=leonhrt/dev-images-hub:agent-test-amd64-cache,mode=max
 
-  # Job para construir la imagen ARM64
   build-arm:
-    runs-on: ubuntu-22.04-arm  # Requiere un runner auto-hospedado en ARM
+    runs-on: ubuntu-22.04-arm
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -64,7 +62,6 @@ jobs:
           cache-from: type=registry,ref=leonhrt/dev-images-hub:agent-test-arm64-cache
           cache-to: type=registry,ref=leonhrt/dev-images-hub:agent-test-arm64-cache,mode=max
 
-  # Job para crear y publicar el manifiesto multi-arquitectura
   create-manifest:
     needs: [build-x86, build-arm]
     runs-on: ubuntu-latest
