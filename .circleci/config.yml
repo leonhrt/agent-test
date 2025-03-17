@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  docker: circleci/docker@2.2.0
+
 parameters:
   image-name:
     type: string
@@ -7,9 +10,6 @@ parameters:
   image-tag:
     type: string
     default: "${CIRCLE_SHA1:0:7}"
-
-orbs:
-  docker: circleci/docker@2.2.0
 
 executors:
   amd64-executor:
@@ -27,33 +27,33 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
-      - docker/check
-      - docker/login:
-          username: $DOCKER_USERNAME
-          password: $DOCKER_PASSWORD
-      - docker/build:
-          image: << pipeline.parameters.image-name >>
-          tag: << pipeline.parameters.image-tag >>-amd64
-          extra_build_args: --platform=linux/amd64
-      - docker/push:
-          image: << pipeline.parameters.image-name >>
-          tag: << pipeline.parameters.image-tag >>-amd64
+      - run:
+          name: Login to Docker Hub
+          command: echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+      - run:
+          name: Build AMD64 image
+          command: |
+            docker build --platform=linux/amd64 -t << pipeline.parameters.image-name >>:<< pipeline.parameters.image-tag >>-amd64 .
+      - run:
+          name: Push AMD64 image
+          command: |
+            docker push << pipeline.parameters.image-name >>:<< pipeline.parameters.image-tag >>-amd64
 
   build-and-push-arm64:
     executor: arm64-executor
     steps:
       - checkout
-      - docker/check
-      - docker/login:
-          username: $DOCKER_USERNAME
-          password: $DOCKER_PASSWORD
-      - docker/build:
-          image: << pipeline.parameters.image-name >>
-          tag: << pipeline.parameters.image-tag >>-arm64
-          extra_build_args: --platform=linux/arm64
-      - docker/push:
-          image: << pipeline.parameters.image-name >>
-          tag: << pipeline.parameters.image-tag >>-arm64
+      - run:
+          name: Login to Docker Hub
+          command: echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+      - run:
+          name: Build ARM64 image
+          command: |
+            docker build --platform=linux/arm64 -t << pipeline.parameters.image-name >>:<< pipeline.parameters.image-tag >>-arm64 .
+      - run:
+          name: Push ARM64 image
+          command: |
+            docker push << pipeline.parameters.image-name >>:<< pipeline.parameters.image-tag >>-arm64
 
   create-manifest-and-push:
     executor: amd64-executor
@@ -68,10 +68,8 @@ jobs:
             chmod +x ~/.docker/cli-plugins/docker-buildx
             docker buildx version
       - run:
-          name: Docker Login
-          command: |
-            # Use a direct login command without stdin redirection
-            docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+          name: Login to Docker Hub
+          command: echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
       - run:
           name: Create and push multi-architecture manifest
           command: |
