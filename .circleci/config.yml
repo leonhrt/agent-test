@@ -25,7 +25,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          version: 20.10.14
+          version: default
       - docker/check:
           registry: $DOCKER_REGISTRY
       - run:
@@ -45,7 +45,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          version: 20.10.14
+          version: default
       - docker/check:
           registry: $DOCKER_REGISTRY
       - run:
@@ -64,7 +64,7 @@ jobs:
     resource_class: small
     steps:
       - setup_remote_docker:
-          version: 20.10.14
+          version: default
       - run:
           name: Create and push multiarch manifest
           command: |
