@@ -150,7 +150,9 @@ jobs:
 
   # App image build
   build-app-amd64:
-    needs: detect-changes
+    needs: 
+      - detect-changes
+      - start-app-phase
     if: |
       always() &&
       (needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true')
