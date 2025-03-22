@@ -13,11 +13,9 @@ on:
     paths:
       - 'app/**'
       - 'Dockerfile.app'
-  workflow_run:
-    workflows:
-      - Build and Push Base Images
+  repository_dispatch:
     types:
-      - completed
+      - base-workflow-completed
   workflow_dispatch:
 
 jobs:

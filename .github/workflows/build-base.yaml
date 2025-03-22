@@ -99,3 +99,13 @@ jobs:
         run: |
           echo "Verifying new manifest..."
           docker manifest inspect ${{ env.DOCKERHUB_REPO }}:${{ env.MANIFEST }}
+
+  notify-app-workflow:
+    needs: create-manifest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger App Workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_GH_TOKEN }}
+          event-type: base-workflow-completed
