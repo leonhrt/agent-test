@@ -13,9 +13,6 @@ on:
     paths:
       - 'app/**'
       - 'Dockerfile.app'
-      - 'Dockerfile.base'
-      - 'poetry.lock'
-      - 'pyproject.toml'
   workflow_run:
     workflows:
       - Build and Push Base Images
