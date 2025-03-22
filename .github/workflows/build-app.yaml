@@ -1,4 +1,4 @@
-name: Build and Push Base Image
+name: Build and Push App Image
 
 env:
   DOCKERHUB_REPO: leonhrt/dev-images-hub
