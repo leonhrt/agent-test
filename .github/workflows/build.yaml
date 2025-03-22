@@ -154,6 +154,7 @@ jobs:
       - detect-changes
       - start-app-phase
     if: |
+      always() &&
       (needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true')
     runs-on: ubuntu-latest
     steps:
@@ -181,7 +182,12 @@ jobs:
           cache-to: type=registry,ref=${{ env.DOCKERHUB_REPO }}:${{ env.APP_IMAGE_AMD64 }}-cache,mode=max
 
   build-app-arm64:
-    needs: start-app-phase
+    needs: 
+      - detect-changes
+      - start-app-phase
+    if: |
+      always() &&
+      (needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true')
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Checkout code
