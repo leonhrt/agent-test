@@ -67,3 +67,34 @@ jobs:
           tags: ${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_ARM64 }}
           cache-from: type=registry,ref=${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_ARM64 }}-cache
           cache-to: type=registry,ref=${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_ARM64 }}-cache,mode=max
+
+  create-manifest:
+    needs: 
+      - build-amd64
+      - build-arm64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Inspect source images
+        run: |
+          echo "Inspecting AMD64 image..."
+          docker manifest inspect ${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_AMD64 }}
+          
+          echo "Inspection ARM64 image..."
+          docker manifest inspect ${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_ARM64 }}
+      - name: Create Multi-Architecture Manifest
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.DOCKERHUB_REPO }}:${{ env.MANIFEST }} \
+            ${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_AMD64 }} \
+            ${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_ARM64 }}
+      
+      - name: Verify new manifest
+        run: |
+          echo "Verifying new manifest..."
+          docker manifest inspect ${{ env.DOCKERHUB_REPO }}:${{ env.MANIFEST }}
