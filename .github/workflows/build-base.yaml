@@ -23,7 +23,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildxleonhrt/dev-images-hub
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Login to DockerHub
@@ -70,7 +70,9 @@ jobs:
           cache-to: type=registry,ref=${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_ARM64 }}-cache,mode=max
 
   create-manifest:
-    needs: [build-amd64, build-arm64]
+    needs: 
+      - build-amd64
+      - build-arm64
     runs-on: ubuntu-latest
     steps:
       - name: Login to DockerHub
