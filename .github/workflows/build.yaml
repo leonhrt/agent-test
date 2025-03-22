@@ -145,6 +145,7 @@ jobs:
       - create-base-manifest
     # Siempre se ejecuta, pero su comportamiento depende de si hubo cambios en base
     if: |
+      always() &&
       needs.detect-changes.outputs.app-changed == 'true' || 
       needs.detect-changes.outputs.base-changed == 'true'
     runs-on: ubuntu-latest
