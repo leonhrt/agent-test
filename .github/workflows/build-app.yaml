@@ -13,6 +13,11 @@ on:
     paths:
       - 'app/**'
       - 'Dockerfile.app'
+  workflow_run:
+    workflows:
+      - Build and Push Base Images
+    types:
+      - completed
   workflow_dispatch:
 
 jobs:
