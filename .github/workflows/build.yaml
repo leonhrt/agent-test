@@ -150,10 +150,10 @@ jobs:
 
   # App image build
   build-app-amd64:
-    #needs: start-app-phase
-    # if: |
-    #   always() &&
-    #   (needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true')
+    needs: detect-changes
+    if: |
+      always() &&
+      (needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
