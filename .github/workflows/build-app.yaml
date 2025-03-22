@@ -1,10 +1,19 @@
 name: Build and Push Base Image
+
+env:
+  DOCKERHUB_REPO: leonhrt/dev-images-hub
+  IMAGE_AMD64: nutria-testagent-app-amd64
+  IMAGE_ARM64: nutria-testagent-app-arm64
+  MANIFEST: nutria-testagent-app
+
 on:
   push:
-    branches: [ main ]
+    branches: 
+      - main
     paths:
       - 'app/**'
       - 'Dockerfile.app'
+  workflow_dispatch:
 
 jobs:
   build-amd64:
@@ -29,9 +38,9 @@ jobs:
           file: ./Dockerfile.app
           platforms: linux/amd64
           push: true
-          tags: leonhrt/dev-images-hub:nutria-testagent-base-amd64
-          cache-from: type=registry,ref=leonhrt/dev-images-hub:nutria-testagent-app-amd64-cache
-          cache-to: type=registry,ref=leonhrt/dev-images-hub:nutria-testagent-app-amd64-cache,mode=max
+          tags: ${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_AMD64 }}
+          cache-from: type=registry,ref=${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_AMD64 }}-cache
+          cache-to: type=registry,ref=${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_AMD64 }}-cache,mode=max
 
   build-arm64:
     runs-on: ubuntu-22.04-arm
@@ -55,5 +64,6 @@ jobs:
           file: ./Dockerfile.app
           platforms: linux/arm64
           push: true
-          cache-from: type=registry,ref=leonhrt/dev-images-hub:nutria-testagent-app-arm64-cache
-          cache-to: type=registry,ref=leonhrt/dev-images-hub:nutria-testagent-app-arm64-cache,mode=max
+          tags: ${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_ARM64 }}
+          cache-from: type=registry,ref=${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_ARM64 }}-cache
+          cache-to: type=registry,ref=${{ env.DOCKERHUB_REPO }}:${{ env.IMAGE_ARM64 }}-cache,mode=max
