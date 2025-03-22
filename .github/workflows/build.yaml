@@ -1,12 +1,10 @@
-name: Build and Push Images
+name: Build and Push Base Images
 
 env:
   DOCKERHUB_REPO: leonhrt/dev-images-hub
-  # Variables para imágenes base
   BASE_IMAGE_AMD64: nutria-testagent-base-amd64
   BASE_IMAGE_ARM64: nutria-testagent-base-arm64
   BASE_MANIFEST: nutria-testagent-base
-  # Variables para imágenes de aplicación
   APP_IMAGE_AMD64: nutria-testagent-app-amd64
   APP_IMAGE_ARM64: nutria-testagent-app-arm64
   APP_MANIFEST: nutria-testagent-app
@@ -48,7 +46,7 @@ jobs:
               - 'app/**'
               - 'Dockerfile.app'
 
-  # BASE IMAGE BUILDS
+  # Base image build
   build-base-amd64:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.base-changed == 'true' }}
@@ -109,7 +107,6 @@ jobs:
     needs:
       - build-base-amd64
       - build-base-arm64
-    if: ${{ needs.detect-changes.outputs.base-changed == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Login to DockerHub
@@ -136,31 +133,27 @@ jobs:
         run: |
           echo "Verifying new manifest..."
           docker manifest inspect ${{ env.DOCKERHUB_REPO }}:${{ env.BASE_MANIFEST }}
-          
-  # WAIT FOR BASE IF NEEDED
-  # Este job esperará a que termine la creación del base si es necesario
-  wait-for-base:
-    needs:
+
+  # Start the build of app image when needed.
+  start-app-phase:
+    needs: 
       - detect-changes
       - create-base-manifest
-    # Siempre se ejecuta, pero su comportamiento depende de si hubo cambios en base
     if: |
       always() &&
-      needs.detect-changes.outputs.app-changed == 'true' || 
-      needs.detect-changes.outputs.base-changed == 'true'
+      (needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true') &&
+      (needs.detect-changes.outputs.base-changed != 'true' || needs.create-base-manifest.result == 'success')
     runs-on: ubuntu-latest
     steps:
-      - name: Check build status
-        run: |
-          if [[ "${{ needs.detect-changes.outputs.base-changed }}" == "true" ]]; then
-            echo "Base changed, waiting for base image build to complete"
-          else
-            echo "Base did not change, proceeding with app build"
-          fi
-          
-  # APP IMAGE BUILDS - Siempre dependen de wait-for-base para asegurar el orden correcto
+      - name: Check if base changes are complete
+        run: echo "Base changes completed or not required, proceeding with app build"
+
+  # App image build
   build-app-amd64:
-    needs: wait-for-base
+    #needs: start-app-phase
+    if: |
+      always() &&
+      (needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -187,7 +180,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.DOCKERHUB_REPO }}:${{ env.APP_IMAGE_AMD64 }}-cache,mode=max
 
   build-app-arm64:
-    needs: wait-for-base
+    needs: start-app-phase
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Checkout code
@@ -232,7 +225,6 @@ jobs:
           
           echo "Inspection ARM64 image..."
           docker manifest inspect ${{ env.DOCKERHUB_REPO }}:${{ env.APP_IMAGE_ARM64 }}
-          
       - name: Create Multi-Architecture Manifest
         run: |
           docker buildx imagetools create \
