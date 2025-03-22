@@ -13,4 +13,3 @@ async def endpoint(text: str = Form(...)):
     )
 
     return llm.complete(text)
-
