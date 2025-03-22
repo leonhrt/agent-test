@@ -154,7 +154,6 @@ jobs:
       - detect-changes
       - start-app-phase
     if: |
-      always() &&
       (needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true')
     runs-on: ubuntu-latest
     steps:
