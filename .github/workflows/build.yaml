@@ -134,10 +134,20 @@ jobs:
           echo "Verifying new manifest..."
           docker manifest inspect ${{ env.DOCKERHUB_REPO }}:${{ env.BASE_MANIFEST }}
 
+  # Check if app pipeline needs to wait.
+  check-app-dependencies:
+    needs: 
+      - detect-changes
+      - create-base-manifest
+    if: ${{ needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if base changes are complete
+        run: echo "Base changes completed or not required, proceeding with app build"
+
   # App image build
   build-app-amd64:
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true' }}
+    needs: check-app-dependencies
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -164,8 +174,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.DOCKERHUB_REPO }}:${{ env.APP_IMAGE_AMD64 }}-cache,mode=max
 
   build-app-arm64:
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true' }}
+    needs: check-app-dependencies
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Checkout code
