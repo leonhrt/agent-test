@@ -134,25 +134,11 @@ jobs:
           echo "Verifying new manifest..."
           docker manifest inspect ${{ env.DOCKERHUB_REPO }}:${{ env.BASE_MANIFEST }}
 
-  # Start the build of app image when needed.
-  start-app-phase:
-    needs: 
-      - detect-changes
-      - create-base-manifest
-    if: |
-      always() &&
-      (needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true') &&
-      (needs.detect-changes.outputs.base-changed != 'true' || needs.create-base-manifest.result == 'success')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check if base changes are complete
-        run: echo "Base changes completed or not required, proceeding with app build"
-
   # App image build
   build-app-amd64:
     needs: 
       - detect-changes
-      - start-app-phase
+      - create-base-manifest
     if: |
       always() &&
       (needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true')
@@ -184,7 +170,7 @@ jobs:
   build-app-arm64:
     needs: 
       - detect-changes
-      - start-app-phase
+      - create-base-manifest
     if: |
       always() &&
       (needs.detect-changes.outputs.app-changed == 'true' || needs.detect-changes.outputs.base-changed == 'true')
@@ -217,6 +203,7 @@ jobs:
     needs: 
       - build-app-amd64
       - build-app-arm64
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Login to DockerHub
