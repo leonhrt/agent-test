@@ -29,7 +29,6 @@ jobs:
     outputs:
       base-changed: ${{ steps.changes.outputs.base-changed }}
       app-changed: ${{ steps.changes.outputs.app-changed }}
-      should-build-app: ${{ steps.set-outputs.outputs.should-build-app }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -49,17 +48,7 @@ jobs:
               - 'app/**'
               - 'Dockerfile.app'
 
-      # Agregar un paso para determinar si debemos construir la app
-      - name: Set additional outputs
-        id: set-outputs
-        run: |
-          if [[ "${{ steps.changes.outputs.app-changed }}" == "true" || "${{ steps.changes.outputs.base-changed }}" == "true" ]]; then
-            echo "should-build-app=true" >> $GITHUB_OUTPUT
-          else
-            echo "should-build-app=false" >> $GITHUB_OUTPUT
-          fi
-
-  # Base image build - solo se ejecuta si hay cambios en la base
+  # BASE IMAGE BUILDS
   build-base-amd64:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.base-changed == 'true' }}
@@ -147,30 +136,30 @@ jobs:
         run: |
           echo "Verifying new manifest..."
           docker manifest inspect ${{ env.DOCKERHUB_REPO }}:${{ env.BASE_MANIFEST }}
-
-  # Un job para determinar si podemos pasar a la fase de app
-  start-app-phase:
+          
+  # WAIT FOR BASE IF NEEDED
+  # Este job esperará a que termine la creación del base si es necesario
+  wait-for-base:
     needs:
       - detect-changes
       - create-base-manifest
-    # Este job se ejecutará cuando:
-    # 1. No hay cambios en la base pero sí en la app (o base)
-    # 2. Hay cambios en la base (y posiblemente también en la app) y ya se ha completado la fase de base
+    # Siempre se ejecuta, pero su comportamiento depende de si hubo cambios en base
     if: |
-      always() && 
-      needs.detect-changes.outputs.should-build-app == 'true' && 
-      (needs.detect-changes.outputs.base-changed != 'true' || needs.create-base-manifest.result == 'success')
+      needs.detect-changes.outputs.app-changed == 'true' || 
+      needs.detect-changes.outputs.base-changed == 'true'
     runs-on: ubuntu-latest
-    outputs:
-      proceed: 'true'  # Añadido para pasar el testigo a los siguientes jobs
     steps:
-      - name: Prepare app phase
-        run: echo "Preparando fase de construcción de app"
-
-  # App image build - se ejecuta después de la fase base (si hay cambios en base) o directamente (si solo hay cambios en app)
+      - name: Check build status
+        run: |
+          if [[ "${{ needs.detect-changes.outputs.base-changed }}" == "true" ]]; then
+            echo "Base changed, waiting for base image build to complete"
+          else
+            echo "Base did not change, proceeding with app build"
+          fi
+          
+  # APP IMAGE BUILDS - Siempre dependen de wait-for-base para asegurar el orden correcto
   build-app-amd64:
-    needs: start-app-phase
-    if: ${{ needs.start-app-phase.outputs.proceed == 'true' }}
+    needs: wait-for-base
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -197,8 +186,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.DOCKERHUB_REPO }}:${{ env.APP_IMAGE_AMD64 }}-cache,mode=max
 
   build-app-arm64:
-    needs: start-app-phase
-    if: ${{ needs.start-app-phase.outputs.proceed == 'true' }}
+    needs: wait-for-base
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Checkout code
