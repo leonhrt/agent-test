@@ -53,7 +53,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Check if base images exist
+      - name: Check if base manifest exist
         id: check-image
         run: |
           if docker manifest inspect ${{ env.DOCKERHUB_REPO }}:${{ env.BASE_MANIFEST }} > /dev/null 2>&1; then
