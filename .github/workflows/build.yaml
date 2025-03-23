@@ -56,12 +56,12 @@ jobs:
       - name: Check if base images exist
         id: check-image
         run: |
-          if docker manifest inspect $IMAGE_NAME > /dev/null 2>&1; then
+          if docker manifest inspect ${{ env.DOCKERHUB_REPO }}:${{ env.BASE_MANIFEST }} > /dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "La imagen $IMAGE_NAME existe en DockerHub"
+            echo "La imagen ${{ env.BASE_MANIFEST }} existe en DockerHub"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "La imagen $IMAGE_NAME no existe en DockerHub"
+            echo "La imagen ${{ env.BASE_MANIFEST }} no existe en DockerHub"
           fi
 
   # Base image build
