@@ -97,7 +97,7 @@ jobs:
   build-base-arm64:
     needs: detect-changes
     if: |
-      needs.detect-changes.outputs.base-changed == 'true' || needs.check-image.outputs.image-exists == 'false'
+      needs.detect-changes.outputs.base-changed == 'true' || needs.detect-changes.outputs.image-exists == 'false'
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Checkout code
