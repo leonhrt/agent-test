@@ -58,17 +58,17 @@ jobs:
         run: |
           if docker manifest inspect ${{ env.DOCKERHUB_REPO }}:${{ env.BASE_MANIFEST }} > /dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "La imagen ${{ env.BASE_MANIFEST }} existe en DockerHub"
+            echo "The manifest ${{ env.BASE_MANIFEST }} exists in DockerHub"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "La imagen ${{ env.BASE_MANIFEST }} no existe en DockerHub"
+            echo "The manifest ${{ env.BASE_MANIFEST }} does not exist in DockerHub"
           fi
 
   # Base image build
   build-base-amd64:
     needs: detect-changes
     if: |
-      needs.detect-changes.outputs.base-changed == 'true'
+      needs.detect-changes.outputs.base-changed == 'true' || needs.detect-changes.outputs.image-exists == 'false'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
